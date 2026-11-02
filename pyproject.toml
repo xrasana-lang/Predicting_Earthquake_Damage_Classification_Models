@@ -1,21 +1,17 @@
 [project]
 name = "predicting-earthquake-damage-classification-models"
 version = "0.1.0"
-description = "Add your description here"
+description = "Classification models for the 2015 Nepal earthquake damage survey"
 readme = "README.md"
 authors = [
     { name = "xrasana-lang", email = "xrasana@gmail.com" }
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "category-encoders>=2.11.2",
     "duckdb>=2.0.0",
+    "matplotlib>=3.11.2",
     "numpy>=2.5.4",
     "pandas>=3.1.0",
+    "seaborn>=0.13.2",
 ]
-
-[project.scripts]
-predicting-earthquake-damage-classification-models = "predicting_earthquake_damage_classification_models:main"
-
-[build-system]
-requires = ["uv_build>=0.13.6,<0.14.0"]
-build-backend = "uv_build"

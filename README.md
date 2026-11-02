@@ -2,7 +2,7 @@
 
 Classification models for predicting severe building damage in the 2015 Nepal (Gorkha) earthquake, using the Nepal Earthquake Damage Assessment survey data.
 
-**Status:** Lesson 4.1 (SQLite and DuckDB database fundamentals) complete.
+**Status:** Lesson 4.1 (SQLite/DuckDB) and Lesson 4.2 (Logistic Regression) complete.
 
 ## What this project does
 
@@ -53,6 +53,23 @@ Two reasons:
 
 DuckDB's convenience (querying CSVs directly, no database import step) still makes it the right choice for reproducibility — a reviewer only needs the CSVs, not a prebuilt `.sqlite` file. But the benchmark result is reported honestly here rather than glossed over.
 
+## Results (Lesson 4.2)
+
+- Trained a logistic regression model using a `Pipeline` with `OneHotEncoder` and `StandardScaler`.
+- **Test Accuracy**: 70.09% (vs 64.40% baseline). Improvement: +5.68 percentage points.
+- **Precision**: 69.10% | **Recall**: 95.92%.
+- **Confusion Matrix**: 1,275 TN, 3,870 FP, 368 FN, 8,655 TP.
+- **AUC**: 0.633 (weak discriminative power; only 13.3 pp better than random).
+
+### Key Findings & Limitations
+
+- **Model is aggressive, not discriminative**: The model correctly identifies 96% of severely damaged buildings (high recall), but it does so by flagging almost everything as "severe." The 3,870 false positives mean it struggles to identify safe buildings.
+- **Low AUC (0.633)**: The model is barely better than random guessing at ranking buildings by risk. It learned that "Mud mortar = bad" and "RC = good", but cannot distinguish *which* Mud buildings will survive.
+- **Class Imbalance**: Because 89.4% of buildings have Mud mortar foundations, the model easily learns the majority pattern but fails on the minority.
+- **Odds Ratios confirm physical intuition**: RC foundation halves the odds of severe damage (OR = 0.59). Mud mortar increases them (OR = 1.38). However, features like age, height, and plinth area contribute almost nothing (OR ≈ 1.0).
+- **Convergence fix**: Initial training failed to converge (1000 iterations) due to unscaled numeric features. Adding `StandardScaler` resolved this (converged in 10 iterations).
+
+
 ## Reproduce
 
     uv sync
@@ -72,6 +89,7 @@ Tested with Python 3.14.2, pandas 3.1.0, numpy 2.5.4, duckdb 2.0.0.
 | Notebook | Topic |
 |---|---|
 | `notebooks/4.1_databases_sqlite_duckdb.ipynb` | SQLite vs DuckDB, relational joins, binary target creation |
+| `notebooks/4.2_logistic_regression.ipynb` | EDA, OneHotEncoding, Logistic Regression, ROC/AUC evaluation |
 
 ## Layout
 

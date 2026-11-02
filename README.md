@@ -2,7 +2,7 @@
 
 Classification models for predicting severe building damage in the 2015 Nepal (Gorkha) earthquake, using the Nepal Earthquake Damage Assessment survey data.
 
-**Status:** Lesson 4.1 (SQLite/DuckDB), Lesson 4.2 (Logistic Regression), and Lesson 4.3 (Decision Trees) complete.
+**Status:** Lessons 4.1 (SQLite/DuckDB), 4.2 (Logistic Regression), 4.3 (Decision Trees), and 4.4 (Demographics & Equity) complete.
 
 ## What this project does
 
@@ -84,6 +84,25 @@ DuckDB's convenience (querying CSVs directly, no database import step) still mak
 - **Ordinal Encoding Caveat**: The tree uses `OrdinalEncoder`, which arbitrarily orders nominal categories like `foundation_type`. While the tree still learns effective splits, the specific hierarchy (e.g., RC = 0 vs Mud = 2) is an artifact of alphabetical encoding, not a physical ordering.
 
 
+## Results (Lesson 4.4)
+
+- Joined the four tables (household_demographics, id_map, building_structure, building_damage) via SQL, producing a household-level dataset with 75,883 rows (vs 70,836 buildings — the difference is multi-household buildings).
+- **Demographics add predictive power**: AUC improved from 0.753 (structural-only) to 0.774 (+0.021) when adding caste, income, education, and household size.
+- **Geography dominates**: removing `vdcmun_id` drops structural-only AUC from 0.753 to 0.656 (-0.097), and full-model AUC from 0.774 to 0.713 (-0.061). The model is almost entirely driven by which municipality a household lives in.
+- **Damage rate range across municipalities**: 43.8% to 93.0%. Top-5 hardest-hit municipalities: 30, 31, 32, 33, 35 (all above 78% damage). The distribution is bimodal.
+
+### Key Findings (Equity)
+
+- **Gurung households are 34.0% of the top-5 hardest-hit municipalities but only 10.0% of the bottom-5 (difference: +24.0 pp).** Magar households show the mirror image (-10.5 pp).
+- **This is a geographic effect, not a causal one.** Gurung communities historically settled the Gorkha epicentral region. The earthquake didn't discriminate by caste; it discriminated by proximity to the fault line.
+- **Policy implication**: reconstruction aid should be geographically targeted (municipalities 30, 31, 32, 33, 35), which will naturally reach Gurung communities without requiring caste-based allocation.
+
+### Modelling Limitations
+
+- **`vdcmun_id` was treated as numeric**, which produces a technically meaningless odds ratio (0.504) but preserves the real geographic signal. A more principled approach would one-hot encode it.
+- **`size_household` may be post-event**: the survey was conducted after the earthquake, so household size could reflect post-earthquake composition.
+- **The model is retrospective**: this is an analysis of the 2015 earthquake, not a predictive system for future events.
+
 ## Reproduce
 
     uv sync
@@ -105,6 +124,7 @@ Tested with Python 3.14.2, pandas 3.1.0, numpy 2.5.4, duckdb 2.0.0.
 | `notebooks/4.1_databases_sqlite_duckdb.ipynb` | SQLite vs DuckDB, relational joins, binary target creation |
 | `notebooks/4.2_logistic_regression.ipynb` | EDA, OneHotEncoding, Logistic Regression, ROC/AUC evaluation |
 | `notebooks/4.3_decision_trees.ipynb` | Decision Trees, validation curve, bias-variance tradeoff, feature importance |
+| `notebooks/4.4_demographics_equity.ipynb` | SQL JOINs, demographic features, caste equity analysis, municipal damage patterns |
 
 ## Layout
 

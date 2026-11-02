@@ -2,7 +2,7 @@
 
 Classification models for predicting severe building damage in the 2015 Nepal (Gorkha) earthquake, using the Nepal Earthquake Damage Assessment survey data.
 
-**Status:** Lesson 4.1 (SQLite/DuckDB) and Lesson 4.2 (Logistic Regression) complete.
+**Status:** Lesson 4.1 (SQLite/DuckDB), Lesson 4.2 (Logistic Regression), and Lesson 4.3 (Decision Trees) complete.
 
 ## What this project does
 
@@ -70,6 +70,20 @@ DuckDB's convenience (querying CSVs directly, no database import step) still mak
 - **Convergence fix**: Initial training failed to converge (1000 iterations) due to unscaled numeric features. Adding `StandardScaler` resolved this (converged in 10 iterations).
 
 
+## Results (Lesson 4.3)
+
+- Built a Decision Tree classifier with a three-way train/validation/test split (60/20/20).
+- Hyperparameter tuning (testing max_depth 1-15) found **best depth = 5** (Validation Accuracy: 71.43%).
+- **Test Accuracy**: **70.41%** (vs 64.41% baseline, +5.99 pp).
+- **Comparison**: Decision Tree (70.41%) and Logistic Regression (70.09%) are statistically tied.
+
+### Key Findings
+
+- **Feature Importance**: `ground_floor_type` dominates with **67%** of the Gini importance. `foundation_type` is second at 16%. The root split isolates a small subset of "safe" buildings (likely RC-engineered ground floors), which drives most of the predictive power.
+- **Bias-Variance Tradeoff**: The validation curve peaked at depth 5. At depth 15, training accuracy reached 75.5% but validation accuracy dropped to 70.4%, demonstrating classic overfitting.
+- **Ordinal Encoding Caveat**: The tree uses `OrdinalEncoder`, which arbitrarily orders nominal categories like `foundation_type`. While the tree still learns effective splits, the specific hierarchy (e.g., RC = 0 vs Mud = 2) is an artifact of alphabetical encoding, not a physical ordering.
+
+
 ## Reproduce
 
     uv sync
@@ -90,6 +104,7 @@ Tested with Python 3.14.2, pandas 3.1.0, numpy 2.5.4, duckdb 2.0.0.
 |---|---|
 | `notebooks/4.1_databases_sqlite_duckdb.ipynb` | SQLite vs DuckDB, relational joins, binary target creation |
 | `notebooks/4.2_logistic_regression.ipynb` | EDA, OneHotEncoding, Logistic Regression, ROC/AUC evaluation |
+| `notebooks/4.3_decision_trees.ipynb` | Decision Trees, validation curve, bias-variance tradeoff, feature importance |
 
 ## Layout
 

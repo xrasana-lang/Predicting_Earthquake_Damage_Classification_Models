@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Project data (do not commit large or downloaded data files) ---
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+*.csv

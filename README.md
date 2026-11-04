@@ -1,135 +1,160 @@
-# Predicting Earthquake Damage Classification Models
+# Nepal Earthquake Damage Classification and Data Analysis
 
-Classification models for predicting severe building damage in the 2015 Nepal (Gorkha) earthquake, using the Nepal Earthquake Damage Assessment survey data.
+A reproducible SQL and Python project that joins Nepal Earthquake Damage Assessment data, builds a severe-damage classification target, compares baseline and machine-learning models, and investigates geographic and demographic patterns responsibly.
 
-**Status:** Lessons 4.1 (SQLite/DuckDB), 4.2 (Logistic Regression), 4.3 (Decision Trees), and 4.4 (Demographics & Equity) complete.
+The analysis focuses on buildings in Gorkha district, the earthquake epicentre. It combines DuckDB, relational joins, reusable data preparation, scikit-learn pipelines, model evaluation, and documented limitations.
 
-## What this project does
+## Why this project matters
 
-- Loads the Nepal earthquake damage survey from CSV files using DuckDB
-- Explores the relational database structure (4 tables, 234,835 buildings, 249,932 households)
-- Builds a reusable data pipeline (`wrangle_nepal_data()`) that joins building features with damage grades and creates a binary `severe_damage` target
-- Filters to the Gorkha district (epicenter of the earthquake)
-- Establishes the baseline classification problem: predict severe damage (Grade 4–5) vs. non-severe (Grade 1–3)
+The technical question is whether building characteristics and related household data can help identify severe structural damage. The broader analytical question is how to interpret the results without confusing geographic association with causal demographic effects.
 
-## Data
+The project starts with the data model rather than jumping directly into modelling. It verifies the source tables, joins them through their keys, checks for orphaned records, creates a clearly defined target, establishes a naïve baseline, and then evaluates increasingly complex models.
 
-The Nepal Earthquake Damage Assessment survey covers four districts in Nepal:
-- Sindhupalchok
-- Okhaldhunga
-- Kavrepalanchok
-- **Gorkha** (epicenter; focus of this project)
+## Data architecture
+
+```mermaid
+flowchart LR
+    STRUCT["building_structure.csv"] --> JOIN["DuckDB / SQL joins"]
+    DAMAGE["building_damage.csv"] --> JOIN
+    HOUSE["household_demographics.csv"] --> JOIN
+    MAP["id_map.csv"] --> JOIN
+    DB["nepal.sqlite"] --> EXPLORE["SQLite and DuckDB exploration"]
+    JOIN --> WRANGLE["duckdb_wrangle.py<br/>wrangle_nepal_data()"]
+    WRANGLE --> TARGET["Gorkha filter and<br/>severe_damage target"]
+    TARGET --> MODELS["Logistic regression<br/>Decision tree"]
+    TARGET --> EQUITY["Municipality and<br/>demographic analysis"]
+    MODELS --> EVAL["Baseline, accuracy,<br/>precision, recall, AUC"]
+```
+
+The workflow is:
+
+1. Inspect the four relational tables and compare SQLite with DuckDB for analytical queries.
+2. Join building, damage, household, and district information with SQL.
+3. Filter to Gorkha and define `severe_damage` as damage Grade 4–5 versus Grade 1–3.
+4. Build reusable preparation logic in `wrangle_nepal_data()`.
+5. Compare logistic regression and decision-tree models with meaningful baselines.
+6. Examine feature importance, geography, demographics, and the limits of interpretation.
+
+## Dataset summary
 
 | Property | Value |
-|---|---|
+|---|---:|
 | Buildings surveyed | 234,835 |
-| Households | 249,932 |
-| Gorkha buildings (complete records) | 70,836 |
-| Severe damage rate (Gorkha) | **64.26%** |
-| Damage grades | 1–5 (Grade 4–5 = severe) |
+| Households surveyed | 249,932 |
+| Gorkha buildings with complete records | 70,836 |
+| Source tables | 4 |
+| Damage grades | 1–5 |
+| Severe-damage definition | Grade 4–5 |
+| Gorkha severe-damage rate | 64.26% |
 
-Files:
-- `nepal.sqlite` — full relational database (git-ignored, 125.7 MB)
-- `data/building_structure.csv` — physical features of each building
-- `data/building_damage.csv` — post-earthquake damage assessment
-- `data/household_demographics.csv` — occupant information
-- `data/id_map.csv` — bridge table linking buildings to households and districts
+The four source tables are `building_structure`, `building_damage`, `household_demographics`, and `id_map`. The full SQLite database and source CSVs are course data and are not committed to the repository.
 
-## Results (Lesson 4.1)
+## Database and data-quality findings
 
-- Confirmed SQLite database contains exactly four tables: `building_structure`, `building_damage`, `household_demographics`, `id_map`.
-- `building_structure` has 18 columns describing physical features. Five distinct foundation types: `Mud mortar-Stone/Brick` (91.5% of all buildings), `RC` (3.7%), `Cement-Stone/Brick` (3.4%), `Bamboo/Timber` (1.0%), `Other` (0.4%).
-- Filtered to Gorkha (district_id = 4): **70,836 buildings** — exact match to the lesson's stated count. Zero orphaned foreign keys across all three joins.
-- Binary target: `severe_damage` = 1 for Grade 4–5 damage, 0 for Grade 1–3.
-- **Baseline accuracy is 64.26%** — any classifier in Lesson 4.2 must beat this. A naïve "always predict severe" classifier gets 64.26% accuracy without learning anything.
+The project verified the four-table SQLite structure and found zero orphaned foreign keys across the relevant joins. DuckDB was selected for the main workflow because it can query the source CSVs directly without requiring a pre-built database import step.
 
-### A surprising benchmark result
+A local benchmark produced an important engineering lesson: SQLite was faster for one small `GROUP BY foundation_type` query on the 234,835-row dataset (0.14 seconds versus 0.63 seconds for DuckDB). CSV parsing dominated the DuckDB query, while SQLite benefited from its pre-built binary database. The result is reported rather than hidden behind a generic claim that one tool is always faster.
 
-The lesson material claims DuckDB is 10–100× faster than SQLite on analytical queries. **On our 234,835-row dataset, SQLite was 4.6× faster** (0.14s vs 0.63s) for a `GROUP BY foundation_type` aggregation query.
+## Model results
 
-Two reasons:
-- **CSV parse cost dominates on small data.** DuckDB reads raw CSV text and must parse it into typed columns before aggregating; SQLite reads a pre-built binary database.
-- **Column storage advantage scales with data size.** DuckDB's memory-bandwidth savings become dominant at 10M+ rows; at 234K rows, everything fits in RAM.
+### Logistic regression
 
-DuckDB's convenience (querying CSVs directly, no database import step) still makes it the right choice for reproducibility — a reviewer only needs the CSVs, not a prebuilt `.sqlite` file. But the benchmark result is reported honestly here rather than glossed over.
+The logistic regression uses a scikit-learn `Pipeline` with one-hot encoding and standardisation. Scaling resolved the initial convergence problem caused by features with different numeric ranges.
 
-## Results (Lesson 4.2)
+- Test accuracy: **70.09%**, compared with a 64.40% baseline
+- Precision: **69.10%**
+- Recall: **95.92%**
+- AUC: **0.633**
+- Confusion matrix: 1,275 true negatives, 3,870 false positives, 368 false negatives, and 8,655 true positives
 
-- Trained a logistic regression model using a `Pipeline` with `OneHotEncoder` and `StandardScaler`.
-- **Test Accuracy**: 70.09% (vs 64.40% baseline). Improvement: +5.68 percentage points.
-- **Precision**: 69.10% | **Recall**: 95.92%.
-- **Confusion Matrix**: 1,275 TN, 3,870 FP, 368 FN, 8,655 TP.
-- **AUC**: 0.633 (weak discriminative power; only 13.3 pp better than random).
+The high recall is useful if missing severe damage is especially costly, but the large number of false positives shows that the model is not strongly discriminative. It flags many buildings as severe because the available structural features do not separate safe and severely damaged buildings very well.
 
-### Key Findings & Limitations
+### Decision tree
 
-- **Model is aggressive, not discriminative**: The model correctly identifies 96% of severely damaged buildings (high recall), but it does so by flagging almost everything as "severe." The 3,870 false positives mean it struggles to identify safe buildings.
-- **Low AUC (0.633)**: The model is barely better than random guessing at ranking buildings by risk. It learned that "Mud mortar = bad" and "RC = good", but cannot distinguish *which* Mud buildings will survive.
-- **Class Imbalance**: Because 89.4% of buildings have Mud mortar foundations, the model easily learns the majority pattern but fails on the minority.
-- **Odds Ratios confirm physical intuition**: RC foundation halves the odds of severe damage (OR = 0.59). Mud mortar increases them (OR = 1.38). However, features like age, height, and plinth area contribute almost nothing (OR ≈ 1.0).
-- **Convergence fix**: Initial training failed to converge (1000 iterations) due to unscaled numeric features. Adding `StandardScaler` resolved this (converged in 10 iterations).
+A three-way 60/20/20 train/validation/test split was used to tune `max_depth` from 1 to 15. Validation performance peaked at depth 5.
 
+- Test accuracy: **70.41%**, compared with a 64.41% baseline
+- Best validation accuracy: **71.43%** at depth 5
+- The tree and logistic regression are effectively tied on test accuracy
+- Training accuracy increased at deeper depths while validation accuracy fell, showing overfitting
 
-## Results (Lesson 4.3)
+`ground_floor_type` contributed 67% of the tree’s Gini importance and `foundation_type` contributed 16%. The tree uses ordinal encoding for some categorical features, so the encoded order should not be interpreted as a physical ranking.
 
-- Built a Decision Tree classifier with a three-way train/validation/test split (60/20/20).
-- Hyperparameter tuning (testing max_depth 1-15) found **best depth = 5** (Validation Accuracy: 71.43%).
-- **Test Accuracy**: **70.41%** (vs 64.41% baseline, +5.99 pp).
-- **Comparison**: Decision Tree (70.41%) and Logistic Regression (70.09%) are statistically tied.
+## Geography and demographics
 
-### Key Findings
+The joined household-level analysis produced 75,883 rows. Adding caste, income, education, and household size improved AUC from 0.753 for the structural-only model to 0.774.
 
-- **Feature Importance**: `ground_floor_type` dominates with **67%** of the Gini importance. `foundation_type` is second at 16%. The root split isolates a small subset of "safe" buildings (likely RC-engineered ground floors), which drives most of the predictive power.
-- **Bias-Variance Tradeoff**: The validation curve peaked at depth 5. At depth 15, training accuracy reached 75.5% but validation accuracy dropped to 70.4%, demonstrating classic overfitting.
-- **Ordinal Encoding Caveat**: The tree uses `OrdinalEncoder`, which arbitrarily orders nominal categories like `foundation_type`. While the tree still learns effective splits, the specific hierarchy (e.g., RC = 0 vs Mud = 2) is an artifact of alphabetical encoding, not a physical ordering.
+Geography had a larger effect than the demographic variables. Removing `vdcmun_id` reduced AUC from 0.753 to 0.656 in the structural-only model and from 0.774 to 0.713 in the full model. Municipality damage rates ranged from 43.8% to 93.0%.
 
+These are associations, not causal effects. Communities are geographically distributed, and the earthquake’s proximity and local building conditions are likely confounding factors. The analysis therefore supports geographically informed reconstruction planning, but it should not be used to infer that caste caused the damage or to justify caste-based allocation.
 
-## Results (Lesson 4.4)
+## What this demonstrates
 
-- Joined the four tables (household_demographics, id_map, building_structure, building_damage) via SQL, producing a household-level dataset with 75,883 rows (vs 70,836 buildings — the difference is multi-household buildings).
-- **Demographics add predictive power**: AUC improved from 0.753 (structural-only) to 0.774 (+0.021) when adding caste, income, education, and household size.
-- **Geography dominates**: removing `vdcmun_id` drops structural-only AUC from 0.753 to 0.656 (-0.097), and full-model AUC from 0.774 to 0.713 (-0.061). The model is almost entirely driven by which municipality a household lives in.
-- **Damage rate range across municipalities**: 43.8% to 93.0%. Top-5 hardest-hit municipalities: 30, 31, 32, 33, 35 (all above 78% damage). The distribution is bimodal.
+This project demonstrates practical foundations for Data Engineering, Analytics Engineering, and Data Analyst roles:
 
-### Key Findings (Equity)
+- Querying and joining relational data with SQL and DuckDB
+- Validating table structure and foreign-key relationships
+- Building a reusable data-preparation function
+- Defining a transparent analytical target and baseline
+- Creating scikit-learn preprocessing and modelling pipelines
+- Evaluating classification with accuracy, precision, recall, confusion matrices, and AUC
+- Tuning a model and identifying overfitting
+- Interpreting feature importance and geographic effects cautiously
+- Reporting tool benchmarks and model limitations honestly
 
-- **Gurung households are 34.0% of the top-5 hardest-hit municipalities but only 10.0% of the bottom-5 (difference: +24.0 pp).** Magar households show the mirror image (-10.5 pp).
-- **This is a geographic effect, not a causal one.** Gurung communities historically settled the Gorkha epicentral region. The earthquake didn't discriminate by caste; it discriminated by proximity to the fault line.
-- **Policy implication**: reconstruction aid should be geographically targeted (municipalities 30, 31, 32, 33, 35), which will naturally reach Gurung communities without requiring caste-based allocation.
+## Repository structure
 
-### Modelling Limitations
+```text
+.
+├── notebooks/
+│   ├── 4.1_databases_sqlite_duckdb.ipynb
+│   ├── 4.2_logistic_regression.ipynb
+│   ├── 4.3_decision_trees.ipynb
+│   └── 4.4_demographics_equity.ipynb
+├── src/
+│   ├── __init__.py
+│   └── duckdb_wrangle.py       # wrangle_nepal_data() pipeline
+├── .python-version
+├── pyproject.toml
+├── uv.lock
+└── README.md
+```
 
-- **`vdcmun_id` was treated as numeric**, which produces a technically meaningless odds ratio (0.504) but preserves the real geographic signal. A more principled approach would one-hot encode it.
-- **`size_household` may be post-event**: the survey was conducted after the earthquake, so household size could reflect post-earthquake composition.
-- **The model is retrospective**: this is an analysis of the 2015 earthquake, not a predictive system for future events.
+## Running the project
 
-## Reproduce
+The source data is not included. To reproduce the work with authorised course data:
 
-    uv sync
-    # Place the Nepal data files:
-    #   - nepal.sqlite (project root)
-    #   - data/building_structure.csv
-    #   - data/building_damage.csv
-    #   - data/household_demographics.csv
-    #   - data/id_map.csv
+1. Install [uv](https://docs.astral.sh/uv/).
+2. Clone the repository and enter the project directory.
+3. Place the following files in the locations expected by the notebooks:
 
-    # Open notebooks/4.1_databases_sqlite_duckdb.ipynb
+   ```text
+   nepal.sqlite
+   data/building_structure.csv
+   data/building_damage.csv
+   data/household_demographics.csv
+   data/id_map.csv
+   ```
 
-Tested with Python 3.14.2, pandas 3.1.0, numpy 2.5.4, duckdb 2.0.0.
+4. Create the environment:
 
-## Notebooks
+   ```bash
+   uv sync
+   ```
 
-| Notebook | Topic |
-|---|---|
-| `notebooks/4.1_databases_sqlite_duckdb.ipynb` | SQLite vs DuckDB, relational joins, binary target creation |
-| `notebooks/4.2_logistic_regression.ipynb` | EDA, OneHotEncoding, Logistic Regression, ROC/AUC evaluation |
-| `notebooks/4.3_decision_trees.ipynb` | Decision Trees, validation curve, bias-variance tradeoff, feature importance |
-| `notebooks/4.4_demographics_equity.ipynb` | SQL JOINs, demographic features, caste equity analysis, municipal damage patterns |
+5. Open the notebooks in order with the project environment selected as the Jupyter kernel:
 
-## Layout
+   ```text
+   notebooks/4.1_databases_sqlite_duckdb.ipynb
+   notebooks/4.2_logistic_regression.ipynb
+   notebooks/4.3_decision_trees.ipynb
+   notebooks/4.4_demographics_equity.ipynb
+   ```
 
-    data/                    raw CSV files (git-ignored)
-    notebooks/               one notebook per lesson
-    src/duckdb_wrangle.py    wrangle_nepal_data(): pipeline for Lesson 4.2+
-    reports/figures/         saved charts
-    pyproject.toml, uv.lock  environment (uv)
+The project was tested with Python 3.14.2, pandas 3.1.0, NumPy 2.5.4, DuckDB 2.0.0, and scikit-learn.
+
+## Limitations and next steps
+
+This is a retrospective analysis of the 2015 earthquake, not a production early-warning or future-earthquake prediction system. `vdcmun_id` was treated as numeric in one analysis even though it represents a categorical municipality; one-hot encoding would be more principled. Household size may also reflect post-event conditions because the survey was conducted after the earthquake.
+
+Future improvements could include group-aware validation by municipality, categorical treatment of geographic identifiers, calibrated probabilities, class-weighted models, stronger external validation, automated data-quality tests, and a documented model card for responsible use.
